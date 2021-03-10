@@ -11,7 +11,7 @@ server = ""  # TODO: set SQL instance
 db = ""  # TODO: set SQL database
 
 # create SQL connection string to INRIX database
-connStr = "DRIVER={ODBC Driver 17 for SQL Server};" + \
+connStr = "DRIVER={SQL Server};" + \
           "SERVER=" + server + ";" + \
           "DATABASE=" + db + ";" + \
           "Trusted_Connection=yes;"
