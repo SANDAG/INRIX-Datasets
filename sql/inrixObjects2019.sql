@@ -18,8 +18,8 @@ GO
 -- create INRIX schema and tables
 
 -- schemas
-CREATE SCHEMA [speed_inrix]
-GO
+--CREATE SCHEMA [speed_inrix]
+--GO
 
 
 -- INRIX speed dataset 2019 15 min data
