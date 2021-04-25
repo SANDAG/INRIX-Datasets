@@ -6,8 +6,8 @@ from zipfile import ZipFile
 
 # load the INRIX TMC geometry file to get the TMC WKT geometry ----
 # the year of the TMC network is currently unknown and was
-# created in 2015 with limited documentation
-tmcGeo = pd.read_csv("../data/tmcGeoPre2016.csv")
+# created in 2016 with limited documentation
+tmcGeo = pd.read_csv("../data/tmcGeo2016.csv")
 
 
 # load all zip files in the data folder ----
@@ -80,12 +80,12 @@ for root, dirs, files in os.walk(settings.folder):
                     print("Loaded: TMC Metadata")
 
 
-# load the manually created cross-reference between the pre-2016 ----
-# INRIX TMC geometry and SANDAG's 2016 highway coverage
+# load the manually created cross-reference between the 2016 ----
+# INRIX TMC geometry and SANDAGs 2016 highway coverage
 # note this assumes the SQL instance can see this projects location
 with settings.conn.cursor() as cursor:
     sql = "BULK INSERT [inrix].[highway_coverage_xref_pre2017] FROM '" + \
-          os.path.realpath("../data/tmcHwyCovXRef2015.csv") + "' " + \
+          os.path.realpath("../data/tmcHwyCovXRef2016.csv") + "' " + \
           "WITH (FIRSTROW = 2, TABLOCK, CODEPAGE = 'ACP', " + \
           "FIELDTERMINATOR=',', ROWTERMINATOR='0x0a');"
     cursor.execute(sql)

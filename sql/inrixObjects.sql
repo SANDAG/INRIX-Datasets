@@ -2602,9 +2602,7 @@ GO
 CREATE TABLE [inrix].[highway_coverage_xref_pre2017] (
 	[tmc_code] nvarchar(50) NOT NULL,
 	[hwycov_id] integer NOT NULL,
-    [tmc_length] float NOT NULL,
     [overlap_length] float NOT NULL,
-    [overlap_proportion] float NOT NULL,
     CONSTRAINT [pk_highway_coverage_xref_pre2017] PRIMARY KEY ([tmc_code], [hwycov_id])
     )
 WITH (DATA_COMPRESSION = PAGE)
