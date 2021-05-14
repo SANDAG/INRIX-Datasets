@@ -9,6 +9,7 @@ GO
 /*****************************************************************************/
 -- remove all INRIX objects
 -- commented out for safety
+--DROP PROCEDURE IF EXISTS [inrix].[sp_agg_speed_data_pre2017]
 --DROP TABLE IF EXISTS [inrix].[highway_coverage_xref_pre2017]
 --DROP TABLE IF EXISTS [inrix].[holiday]
 --DROP TABLE IF EXISTS [inrix].[speed_data_pre2017]
@@ -2606,4 +2607,102 @@ CREATE TABLE [inrix].[highway_coverage_xref_pre2017] (
     CONSTRAINT [pk_highway_coverage_xref_pre2017] PRIMARY KEY ([tmc_code], [hwycov_id])
     )
 WITH (DATA_COMPRESSION = PAGE)
+GO
+
+
+/*****************************************************************************/
+-- create INRIX programmability objects
+
+CREATE PROCEDURE [inrix].[sp_agg_speed_data_pre2017]
+    @time_column nvarchar(max),  -- column in [inrix].[time_min1_xref]
+    -- table used to aggregate TMC link speed data to user-specified
+    -- temporal resolution
+    @year_filter integer -- year of data to calculate metric for
+AS
+/**
+summary:   >
+    Aggregates the pre-2017 INRIX one minute speed dataset within each month
+	of available data for a user-specified year at a user-specified time
+    resolution. Note the data operates at the one minute resolution so
+    aggregation can only be done at the five minute level or above.
+
+    Provides the average speed weighted by the number of observations
+    in the raw dataset used to calculate the metric for each user-specified
+	time resolution period.
+
+    Also provided are the total number of records in the raw dataset used to
+	calculate the metric within the given year, month, station, and
+	user-specified time resolution period.
+
+    Weekends, holidays, records where [speed] <= 5, and records where
+	[confidence_score] < 30 are removed from the aggregation.
+    The result set can be further filtered or aggregated across month
+    and user-specified time resolution periods making sure to weight by the
+    number of observations [n] using the formulas:
+        [metric] = SUM([metric] * [n]) / SUM([n])
+**/
+BEGIN
+    IF NOT EXISTS(SELECT [COLUMN_NAME] FROM INFORMATION_SCHEMA.COLUMNS WHERE [TABLE_SCHEMA] = 'inrix' AND [TABLE_NAME] = 'time_min1_xref' AND [COLUMN_NAME] = @time_column)
+    BEGIN
+        RAISERROR ('The column %s does not exist in the [inrix].[time_min1_xref] table.', 16, 1, @time_column)
+    END
+    ELSE
+    BEGIN
+		-- build dynamic SQL string
+		DECLARE @sql nvarchar(max) = '
+		with [tbl_day] AS (
+			SELECT
+				CONVERT(DATE, [measurement_tstamp]) AS [date]
+				,DATEPART(MONTH, [measurement_tstamp]) AS [month_number]
+				,DATENAME(MONTH, [measurement_tstamp]) AS [month]
+				,[tmc_code]
+				,[time_min1_xref].' + @time_column + '
+				,AVG([speed]) AS [speed]  -- speed aggregated to time periods of interest within the day
+				,COUNT([speed]) AS [n]  -- total number of valid records across all records aggregated to time periods of interest within the day
+			FROM
+				[inrix].[speed_data_pre2017]
+			INNER JOIN
+				[inrix].[time_min1_xref]
+			ON
+				CONVERT(TIME, [speed_data_pre2017].[measurement_tstamp]) = [time_min1_xref].[min1_period_start]
+			WHERE
+				DATENAME(WEEKDAY, [measurement_tstamp]) NOT IN (''Saturday'', ''Sunday'')  -- remove weekends from the aggregation
+				AND CONVERT(DATE, [measurement_tstamp]) NOT IN (SELECT [date] FROM [inrix].[holiday])  -- remove holidays from the aggregation
+				AND [speed] > 5  -- exclude suspicious speed which is likely under construction at the time
+				AND [confidence_score] >= 30  -- filter the speed dataset for real-time speed only
+				AND [speed] IS NOT NULL  -- do not count records where speed was not measured
+				AND DATENAME(YEAR, [measurement_tstamp]) = ' + CONVERT(nvarchar, @year_filter) + '
+			GROUP BY
+				CONVERT(DATE, [measurement_tstamp])
+				,DATEPART(MONTH, [measurement_tstamp])
+				,DATENAME(MONTH, [measurement_tstamp])
+				,[tmc_code]
+				,[time_min1_xref].' + @time_column + '),
+		[records_check] AS (
+			SELECT
+				' + @time_column + '
+				,COUNT([min1]) AS [n]
+			FROM
+				[inrix].[time_min1_xref]
+			GROUP BY
+				' + @time_column + ')
+		SELECT
+			' + CONVERT(nvarchar, @year_filter) + ' AS [year]
+			,[month]
+			,[tmc_code]
+			,[tbl_day].' + @time_column + '
+			,SUM(1.0 * [speed] * [tbl_day].[n]) / SUM([tbl_day].[n]) AS [speed]  -- speed weighted by number of samples used in computing each record
+			,SUM([tbl_day].[n]) AS [n]  -- total number of valid records used in computing metric values that make up the average metric
+		FROM
+			[tbl_day]
+		GROUP BY
+			[month_number]
+			,[month]
+			,[tmc_code]
+			,[tbl_day].' + @time_column
+
+        -- execute dynamic SQL string
+	    EXECUTE (@sql)
+    END
+END
 GO
