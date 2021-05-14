@@ -2624,7 +2624,7 @@ summary:   >
     Aggregates the pre-2017 INRIX one minute speed dataset within each month
 	of available data for a user-specified year at a user-specified time
     resolution. Note the data operates at the one minute resolution so
-    aggregation can only be done at the five minute level or above.
+    aggregation can only be done at the one minute level or above.
 
     Provides the average speed weighted by the number of observations
     in the raw dataset used to calculate the metric for each user-specified
@@ -2664,7 +2664,9 @@ BEGIN
 			INNER JOIN
 				[inrix].[time_min1_xref]
 			ON
-				CONVERT(TIME, [speed_data_pre2017].[measurement_tstamp]) = [time_min1_xref].[min1_period_start]
+				-- the CAST, DATEADD, and DATEDIFF acts as a floor function
+				-- removing seconds and milliseconds from the INRIX timestamp
+				CAST(DATEADD(minute, DATEDIFF(minute, 0, [measurement_tstamp]), 0) AS TIME) = [time_min1_xref].[min1_period_start]
 			WHERE
 				DATENAME(WEEKDAY, [measurement_tstamp]) NOT IN (''Saturday'', ''Sunday'')  -- remove weekends from the aggregation
 				AND CONVERT(DATE, [measurement_tstamp]) NOT IN (SELECT [date] FROM [inrix].[holiday])  -- remove holidays from the aggregation
