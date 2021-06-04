@@ -1250,7 +1250,7 @@ CREATE TABLE [inrix].[speed_15min](
 GO
 
 
--- create INRIX 15-minute sped aggregator ------------------------------------
+-- create INRIX 15-minute speed aggregator ------------------------------------
 CREATE PROCEDURE [inrix].[sp_agg_speed_15min]
     @time_column nvarchar(max),  -- column in [inrix].[time_min15_xref]
     -- table used to aggregate XD link speed data to user-specified
@@ -1273,7 +1273,7 @@ summary:   >
 	user-specified time resolution period.
 
     Weekends, holidays, records where [speed] <= 5, and records where
-	[confidence_score] < 30 are removed from the aggregation.
+	[c_value] = 0  are removed from the aggregation.
     The result set can be further filtered or aggregated across month
     and user-specified time resolution periods making sure to weight by the
     number of observations [n] using the formulas:
@@ -1309,8 +1309,7 @@ BEGIN
 				DATENAME(WEEKDAY, [date_time]) NOT IN (''Saturday'', ''Sunday'')  -- remove weekends from the aggregation
 				AND CONVERT(DATE, [date_time]) NOT IN (SELECT [date] FROM [inrix].[holiday])  -- remove holidays from the aggregation
 				AND [speed] > 5  -- exclude suspicious speed which is likely under construction at the time
-				AND [c_value] >= 30  -- filter the speed dataset for real-time speed only
-				AND [speed] IS NOT NULL  -- do not count records where speed was not measured
+				AND [c_value] > 0  -- filter the speed dataset for real-time speed only
 				AND DATENAME(YEAR, [date_time]) = ' + CONVERT(nvarchar, @year_filter) + '
 			GROUP BY
 				CONVERT(DATE, [date_time])
